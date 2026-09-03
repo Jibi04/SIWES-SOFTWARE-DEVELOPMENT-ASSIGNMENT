@@ -1,8 +1,17 @@
+from helper_functions import get_integer_input_from_user
 def student_result_checker():
     name = input('Your Name: ')
-    score = get_user_values('Your Score')
-
     print(f'Hi {name},')
+    while True:
+        score = get_integer_input_from_user('Your Score: ')
+        if score > 100:
+            print('Score cannot be greated than 100')
+            continue
+        elif score < 0:
+            print('Score cannot be less zero (0)')
+            continue
+        else:
+            break
     if (100 >= score >= 70):
         print('Congrationtulations. \nYour grade is \'A\'')
     elif (69 >= score >= 60):
@@ -15,16 +24,6 @@ def student_result_checker():
         print('Your grade is \'E\', You can do better.')
     else:
         print('Your grade is \'F\', Better luck next time.')
-
-def get_user_values(msg: str):
-    while True:
-        try:
-            res = input(f'{msg}: ')
-            val = float(res)
-            return val
-        except ValueError:
-            print(f'Invalid Value expected an Integer/Decimal but got \'{type(res).__name__}\'')
-            continue
 
 if __name__ == '__main__':
     student_result_checker()
