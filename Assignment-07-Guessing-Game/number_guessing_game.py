@@ -1,5 +1,4 @@
 import random
-
 def guess_the_number():
     number = random.randint(0, 1000)
     attempts = 0
@@ -13,11 +12,10 @@ def guess_the_number():
         if player_guess.lower() =='q':
             print('Quitting...')
             break 
-        try:
-            player_guess = int(player_guess)
-        except ValueError:
-            print("Expected Integer but got 'str'.")
+        if not player_guess.isdigit():
+            print("Please provide a valid Integer.")
             continue
+        player_guess = int(player_guess)
         if player_guess > number:
             print("Too High")
         elif player_guess < number:
