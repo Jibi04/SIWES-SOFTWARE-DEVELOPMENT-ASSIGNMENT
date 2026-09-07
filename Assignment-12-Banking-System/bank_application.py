@@ -1,12 +1,13 @@
 import time
 from typing import Dict
-from helper_functions import validate_account_number, get_valid_user_profile, generate_account_number, User, should_continue, validate_client_amt, get_integer_input_from_user, get_floating_input_from_user, get_valid_transaction_pin, get_valid_account_type, messenger, validate_four_digit
+from helper_functions import validate_account_number, get_valid_user_profile, generate_account_number, User, should_continue, validate_client_amt, get_integer_input_from_user, get_valid_transaction_pin, get_valid_account_type, messenger, validate_four_digit
 
 USERS_DATABASE: Dict[str, User] = {}
 
 def create_account():
     new_user = get_valid_user_profile()
-    account_name = str(new_user.get('firstname', '')) + str(new_user.get('lastname', ''))
+    account_name = f'{new_user.get('firstname', '').capitalize()} {new_user.get('lastname', '').capitalize()}'
+
     acct_type = get_valid_account_type()
     acct_no = generate_account_number()
     transaction_pin = get_valid_transaction_pin()
@@ -43,7 +44,6 @@ def bank_app():
     print(f'Thank you for banking with us.')
 
 def atm_machine(user: User):
-    available_balance = user.available_balance
     print(f"Welcome {user.firstname.capitalize()},")
 
     while True:
@@ -60,9 +60,7 @@ def atm_machine(user: User):
         else:
             if response == 1:
                 simulate_processing()
-                print(f'Your available balance: ${float(available_balance)}')
-                if not should_continue():
-                    break
+                print(f'Your available balance: ${float(user.available_balance)}')
             elif response == 2:
                 deposit(user)
             elif response == 3:
@@ -117,7 +115,8 @@ def withdraw(user: User):
         if amt > available_balance:
             print("Insufficient Account Balance")
             if not should_continue(msg='Would you like to try again?'):
-                break
+                return
+            continue
         available_balance-=amt
         user.available_balance = available_balance
         simulate_processing()
@@ -125,18 +124,15 @@ def withdraw(user: User):
         break
 
 def is_valid_pin(user_pin: str) -> bool:
-    for trial in range(1, 4):
-        msg = '4 digit pin: '
-        if trial > 1:
-            msg = f'you have {4 - trial} attempts left.'
-
-        response = validate_four_digit(msg)
+    for trial in range(1, 5):
+        attempts_remaining = 4 - trial
+        response = validate_four_digit("enter 4 digit pin: ")
         if response == user_pin:
             return True
-        error_msg = "Incorrect pin"
-        if trial == 4:
-            error_msg = "trials exhausted."
-        print(error_msg)
+        if attempts_remaining > 0:
+            print(f'you have {attempts_remaining} attempt(s) left.')
+        else:
+            print("Incorrect pin, No more attempts.")
 
     return False
 
