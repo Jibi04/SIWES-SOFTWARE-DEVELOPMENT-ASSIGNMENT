@@ -1,21 +1,43 @@
 import re
 import random
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Dict
 from dataclasses import dataclass
 
 @dataclass
 class User:
     firstname: str
     lastname: str
-    age: int
-    state: str
-    lga: str
+    birthyear: int
+    nationality: str
+    email: str
+    phone: str
     account_number: str 
-    account_type: Literal['savings', 'current'] = 'savings'
-    account_name: str | None = None
+    transaction_pin: str
     available_balance: int = 0
+    account_name: str | None = None
+    account_type: Literal['savings', 'current'] = 'savings'
 
+def validate_four_digit(msg: str) -> str:
+    while True:
+        response = input(msg).strip()
+        if not response.isdigit():
+            print("Invalid input, please select 4 digit integers only")
+            continue
+        if len(response) != 4:
+            print("Invalid input, must be 4 digits")
+            continue
+        return response
+
+def get_valid_transaction_pin() -> str:
+    while True:
+        response1 = validate_four_digit(msg="4 digit transaction pin: ")
+        response2 = validate_four_digit(msg="Confirm 4 digit transaction pin: ")
+
+        if response1 != response2:
+            print("transaction pin does not match please try again.")
+            continue
+        return response1
 
 def get_valid_email() -> str:
     while True:
@@ -44,47 +66,55 @@ def get_valid_phone(msg='Phone No: ') -> str:
     
 def get_floating_input_from_user(msg: str) -> float:
     while True:
-        res = input(f'{msg}')
-        if not res.isdigit():
-            print('please input a valid integer or decimal')
+        try:
+            res = float(input(f'{msg}'))
+            if res <= 0:
+                print('Please input a valid integer greater than zero.')
+                continue
+            return float(res)
+        except ValueError:
+            print('Please input a valid integer or decimal.')
             continue
-        return float(res)
 
 def get_integer_input_from_user(msg: str) -> int:
     while True:
         res = input(f'{msg}')
-        
         if not res.isdigit():
             print('Please input a valid Integer value')
             continue
         integer_res = int(res)
-        if integer_res < 0:
+        if integer_res <= 0:
             print('Please select a valid integer greater than zero.')
+            continue
         return integer_res
 
-def validate_client_amt(msg: str) -> float:
+def validate_client_amt(msg: str) -> int:
     while True:
         try:
-            amt = float(input(f'{msg}'))
+            amt = int(input(f'{msg}'))
         except ValueError:
-            print('Please, Input a valid Integer or Decimal greater than $0.00')
+            print('Please, Input a valid Amount greater than $0.00')
             continue
         if amt <= 0:
             print('Invalid ammount')
             continue
         return amt
 
-def get_valid_age() -> int:
+def get_birth_year() -> str:
     while True:
         res = get_integer_input_from_user(msg='Birth year: ')
         if (1905 >= res) or (res >= datetime.now().year):
-            print('Invalid age')
+            print('Invalid birth year')
             continue
-        return (datetime.now().year - res)
+        return str(res)
+    
+def get_valid_age() -> int:
+    res = get_birth_year()
+    return (datetime.now().year - int(res))
 
-def should_continue():
+def should_continue(msg='Would you like to do anything else?'):
     while True:
-        response = input('Would you like to do anything else? (1 - YES, 0 - NO): ')
+        response = input( msg + '(1 - YES, 0 - NO): ')
         if (not response.isdigit()) or (int(response) not in (1, 0)):
             print("Invalid Response")
             continue
@@ -141,16 +171,17 @@ def get_valid_user_profile():
     return dict(
         firstname = get_valid_text_from_user('First Name: '),
         lastname = get_valid_text_from_user('Last Name: '),
-        age = get_valid_age(),
-        state = get_valid_text_from_user('State: '),
-        lga = get_valid_text_from_user('LGA: '),
-        account_type = get_valid_account_type() # savings, current
+        birthyear = get_birth_year(),
+        nationality = get_valid_text_from_user("Nationality: "),
+        email= get_valid_email(),
+        phone= get_valid_phone(),
         ) 
+
 def generate_account_number():
     number = str(datetime.now().year)[2:] + str(random.randrange(10000000, 99999999))
     return number
 
-def get_valid_account_type():
+def get_valid_account_type() -> Literal['current', 'savings']:
     acct_type_map = {
         1: 'savings',
         2: 'current',
@@ -168,18 +199,26 @@ def user_to_dict(user: User):
     return {
         'firstname': user.firstname,
         'lastname': user.lastname,
-        'age': user.age,
-        'state': user.state,
-        'lga': user.lga,
+        'birthyear': user.birthyear,
+        'nationality': user.nationality,
+        'email': user.email,
+        'phone': user.phone,
         'acct-name': user.account_name,
         'acct-no': user.account_number,
         'acct-type': user.account_type,
     }
 
-def validate_account_number():
+def validate_account_number(msg='Account Number: '):
     while True:
-        acct_no = get_valid_text_from_user('Account Number: ')
+        acct_no = get_valid_text_from_user(msg)
         if not acct_no.isdigit() or (not len(acct_no) == 10):
-            print('Invalid Account number.')
+            print('Invalid Account number. (ctrl-c to quit)')
             continue
         return acct_no
+
+def messenger(status: bool, msg: str, payload: Any = None) -> Dict[str, bool | str]:
+    return {
+        'status': status,
+        'message': msg,
+        'payload': payload
+    }
