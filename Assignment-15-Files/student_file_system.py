@@ -1,6 +1,10 @@
 from pathlib import Path
 from typing import Literal
-from helper_functions import get_student_data, get_valid_matric_no, generate_matric_no, get_valid_text_from_user,get_integer_input_from_user, should_continue, Student
+from validators import get_student_data, get_valid_matric_no, get_valid_text_from_user,get_integer_input_from_user
+from helper_functions import generate_matric_no,  should_continue
+from models import Student
+from exceptions import StudentRepositoryError, StudentNotFoundError
+from repository import write_as_batch, write_single_file,  format_students_data_to_dict
 
 class StudentRepository:
     def __init__(self, department: str):
@@ -15,24 +19,22 @@ class StudentRepository:
         self.filename = student_data_dir / f'{department}_students.txt'
 
     def _load_student_data(self) -> dict[str, Student]:
-        if not self.validate_file_content():
+        if not self.file_exists_and_not_empty():
             try:
                 text = "*name|age|major|phone|email|matric_no\n"
                 self.filename.write_text(text)
                 return {}
-            except PermissionError:
-                raise IncompleteOperationError(f"Permission Error: '{self.filename}'")
             except OSError as error:
-                raise IncompleteOperationError(f"Unable to load student data: {error}")
+                raise StudentRepositoryError(f"Unable to load student data: {error}")
         
         return format_students_data_to_dict(self.filename)
 
-    def validate_file_content(self) -> bool:
+    def file_exists_and_not_empty(self) -> bool:
         if not self.filename.exists():
             return False
         return self.filename.stat().st_size > 0
 
-    def write_to_file(self, mode: Literal['a', 'w'], data) -> bool:
+    def write_to_file(self, mode: Literal['a', 'w'], data) -> None:
         type_of_write = {
             'a': write_single_file,
             'w': write_as_batch,
@@ -43,43 +45,34 @@ class StudentRepository:
         try:
             func_to_call = type_of_write[mode]
             return func_to_call(filename=self.filename, data=data)
-        except PermissionError:
-            raise IncompleteOperationError(f"""
-            Unable to save student data:
-            Permission error '{self.filename}'
-            """)
         except OSError as error:
-            raise IncompleteOperationError(f"Unable to save student data: {error}")
+            raise StudentRepositoryError(f"Unable to save student data: {error}")
 
     def search_student(self, key: str) -> Student | None:
         return self.students_data.get(key)
 
-    def save_students_to_db(self, data) -> bool:
+    def save_students_to_db(self, data) -> None:
         return self.write_to_file(mode='w', data=data)
 
-    def save_student_to_db(self, data) -> bool:
-        return self.write_to_file(data=data, mode='a')
+    def save_student_to_db(self, data) -> None:
+        self.write_to_file(data=data, mode='a')
+        self.update_student_data()
 
-    def delete_student_data(self, key: str) -> bool:
+    def delete_student_data(self, key: str) -> None:
         students = self.students_data.copy()
         if key not in self.students_data:
-            return False
+            raise StudentNotFoundError(f"Invalid Matric Number: '{key}'")
         
         del self.students_data[key]
-        status = self.save_students_to_db(self.students_data)
-
-        if not status:
-            self.students_data = students
-            return False
-        return True
-
+        self.save_students_to_db(self.students_data)
+        self.update_student_data()
+    
     def update_student_data(self) -> None:
         self.students_data = self._load_student_data()
 
-class StudentManagement:
+class StudentService:
     def __init__(self, department: str):
         self.student_repo = StudentRepository(department)
-        self.students_data = self.student_repo.students_data
 
     def add_student(self, data: Student) -> str:
         while True:
@@ -90,89 +83,38 @@ class StudentManagement:
         data['matric_no'] = matric_no
         
         status = self.student_repo.save_student_to_db(data)
-        if not status:
-            raise ValueError("Error: Unable to complete save.")
-        self.student_repo.update_student_data()
         return matric_no
 
     def get_student(self, key: str) -> Student:
         entry = self.student_repo.search_student(key)
         if entry is None:
-            raise ValueError(f'{key} not a registered student.')
+            raise StudentNotFoundError(f'{key} not a registered student.')
         return entry
         
     def delete_student(self, key: str) -> None:
         if self.student_repo.search_student(key) is None:
-            raise ValueError(f"Invalid Matric No: {key}")
-        self.student_repo.update_student_data()
+            raise StudentNotFoundError(f"Invalid Matric No: {key}")
+        self.student_repo.delete_student_data(key)
+        
 
-
-def write_single_file(filename: Path, data) -> bool:
-    line = format_students_data_as_txt(data)
-    with open(filename, 'a') as f:
-        f.write(line)
-    return True
-
-def write_as_batch(filename: Path, data) -> bool:
-    text = "*name|age|major|phone|email|matric_no\n"
-    for entry in data.values():
-        line = format_students_data_as_txt(entry)
-        text += line
-    filename.write_text(text)
-    return True
-
-def format_students_data_as_txt(data) -> str:
-    line = f"{data['name']}|{data['age']}|{data['major']}|{data['phone']}|{data['email']}|{data['matric_no']}\n"
-    return line
-
-def format_students_data_to_dict(filename: Path) -> dict[str, Student]:
-    data = {}
-    with filename.open('r') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-
-            parts = line.strip().split('|')
-            if line.startswith('*'):
-                continue
-            elif len(parts) != 6:
-                print("Corrupted line skipping...")
-                continue
-            name, age, major, phone, email, mat_no = parts
-            data[mat_no]={
-                'name': name,
-                'age': age,
-                'major': major,
-                'phone': phone,
-                'email': email,
-                'matric_no': mat_no
-            }
-
-    return data
-    
-
-def add_student_ui(management: StudentManagement) -> None:
+def add_student_ui(management: StudentService) -> None:
     data = get_student_data()
     try:
         matric_no = management.add_student(data)
         print(f"Your Matric No is '{matric_no}'")
         return
-    except ValueError:
-        print("Unable to create student Data at the moment.")
-        return
-    except IncompleteOperationError as e:
-        print(f"Unable to create student data.\n{str(e)}")
+    except StudentRepositoryError as e:
+        print(e)
 
-def get_student_ui(management: StudentManagement) -> None:
+def get_student_ui(management: StudentService) -> None:
     key = get_valid_matric_no()
     try:
         student_entry = management.get_student(key)
-    except ValueError:
-        print(f"'{key}' not a registered Student.")
+    except StudentNotFoundError as e:
+        print(e)
         return
-    except IncompleteOperationError as e:
-            print(f"Unable to create student data.\n{str(e)}")
+    except StudentRepositoryError as e:
+        print(e)
     
     line = 50 * '*'
     print(line)
@@ -181,19 +123,16 @@ def get_student_ui(management: StudentManagement) -> None:
     print(student_entry)
     return
 
-def delete_student_ui(management: StudentManagement) -> None:
+def delete_student_ui(management: StudentService) -> None:
     key = get_valid_matric_no()
     try:
         management.delete_student(key)
         print("Student data deleted.")
-    except ValueError as e:
-        print(str(e))
+    except StudentNotFoundError as e:
+        print(e)
         return
-    except IncompleteOperationError as e:
-            print(f"Unable to create student data.\n{str(e)}")
-
-
-class IncompleteOperationError(Exception):...
+    except StudentRepositoryError as e:
+        print(e)
 
 def student_file_system_handler() -> None:
     line = 40 * '*'
@@ -210,8 +149,8 @@ def student_file_system_handler() -> None:
 
     department = get_valid_text_from_user(msg='Department: ')
     try:
-        dept_management = StudentManagement(department)
-    except IncompleteOperationError as error:
+        dept_management = StudentService(department)
+    except StudentRepositoryError as error:
         print(f"Error: {error}")
         return
     
