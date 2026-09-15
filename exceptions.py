@@ -1,0 +1,12 @@
+class IncompleteOperationError(Exception):...
+class BorrowedoutError(Exception):...
+class InsufficientBalanceError(Exception):...
+class NotEnoughCopies(Exception):
+    def __init__(self, copies_available: int, *args, **kwargs):
+        self.copies_available = copies_available
+        super().__init__(f"There are only {self.copies_available} available")
+class StudentNotFoundError(Exception):
+    pass
+
+class StudentRepositoryError(Exception):
+    pass
