@@ -1,135 +1,20 @@
-import re
 import random
-from datetime import datetime
-from typing import Any, Literal, Dict
-from dataclasses import dataclass
+from datetime import datetime, UTC
+from typing import Literal
+from models import User, Book
+from validators import validate_four_digit
 
-@dataclass
-class User:
-    firstname: str
-    lastname: str
-    birthyear: int
-    nationality: str
-    email: str
-    phone: str
-    account_number: str 
-    transaction_pin: str
-    available_balance: int = 0
-    account_name: str | None = None
-    account_type: Literal['savings', 'current'] = 'savings'
 
-def validate_four_digit(msg: str) -> str:
-    while True:
-        response = input(msg).strip()
-        if not response.isdigit():
-            print("Invalid input, please select 4 digit integers only")
-            continue
-        if len(response) != 4:
-            print("Invalid input, must be 4 digits")
-            continue
-        return response
-
-def get_valid_transaction_pin() -> str:
-    while True:
-        response1 = validate_four_digit(msg="4 digit transaction pin: ")
-        response2 = validate_four_digit(msg="Confirm 4 digit transaction pin: ")
-
-        if response1 != response2:
-            print("transaction pin does not match please try again.")
-            continue
-        return response1
-
-def get_valid_email() -> str:
-    while True:
-        res = get_valid_text_from_user('Email: ')
-        if '@' not in res:
-            print(f'Invalid Email address')
-            continue
-
-        pattern = r'\.([a-z]{2,3})$'
-        pattern = re.compile(pattern=pattern)
-        if not pattern.search(res):
-            print('Invalid Email Address')
-            continue
-        return res
-
-def get_valid_phone(msg='Phone No: ') -> str:
-    while True:
-        res = input(f'{msg}').strip().lower()
-        if not res.isdigit():
-            print(f'Invalid Phone number.')
-            continue
-        if len(res) != 11:
-            print(f'Invalid Phone number')
-            continue
-        return res
-    
-def get_floating_input_from_user(msg: str) -> float:
-    while True:
-        try:
-            res = float(input(f'{msg}'))
-            if res <= 0:
-                print('Please input a valid integer greater than zero.')
-                continue
-            return float(res)
-        except ValueError:
-            print('Please input a valid integer or decimal.')
-            continue
-
-def get_integer_input_from_user(msg: str) -> int:
-    while True:
-        res = input(f'{msg}')
-        if not res.isdigit():
-            print('Please input a valid Integer value')
-            continue
-        integer_res = int(res)
-        if integer_res <= 0:
-            print('Please select a valid integer greater than zero.')
-            continue
-        return integer_res
-
-def validate_client_amt(msg: str) -> int:
-    while True:
-        try:
-            amt = int(input(f'{msg}'))
-        except ValueError:
-            print('Please, Input a valid Amount greater than $0.00')
-            continue
-        if amt <= 0:
-            print('Invalid ammount')
-            continue
-        return amt
-
-def get_birth_year() -> str:
-    while True:
-        res = get_integer_input_from_user(msg='Birth year: ')
-        if (1905 >= res) or (res >= datetime.now().year):
-            print('Invalid birth year')
-            continue
-        return str(res)
-    
-def get_valid_age() -> int:
-    res = get_birth_year()
-    return (datetime.now().year - int(res))
-
-def should_continue(msg='Would you like to do anything else?'):
+def should_continue(msg='Would you like to do anything else? ') -> bool:
     while True:
         response = input( msg + '(1 - YES, 0 - NO): ')
         if (not response.isdigit()) or (int(response) not in (1, 0)):
             print("Invalid Response")
             continue
 
-        return int(response)
+        return int(response) == 1
 
-def get_contact_info():
-    return {
-        'firstname': get_valid_text_from_user('First Name: '),
-        'lastname': get_valid_text_from_user('Last Name: '),
-        'phone': get_valid_phone(),
-        'email': get_valid_email()
-    }
-
-def get_contact_card(data: dict[str, Any]):
+def get_contact_card(data: dict[str, str]):
     line = 50 * '*'
     contact_card = f"""
 {line}
@@ -140,60 +25,24 @@ Phone: {data.get('phone', '')}
 """
     return contact_card
 
-def get_student_data():
-    return {
-        'name': get_valid_text_from_user('Student Name: '), 
-        'age': get_valid_age(), 
-        'course': get_valid_text_from_user('Course: '), 
-        'phone': get_valid_phone(), 
-        'email': get_valid_email(),
-        'department': get_valid_text_from_user('Department: '),
-        'matric-no': get_valid_matric_no(),
-    }
-
-def get_valid_text_from_user(msg: str = '') -> str:
-    while True:
-        response = input(f'{msg}').strip().lower()
-        if not response:
-            print("Field is empty.")
-            continue
-        return response
-
-def get_valid_matric_no() -> str:
-    while True:
-        mat_no = get_valid_text_from_user(msg='Matric NO: ')
-        if re.search(r's\d{4}$', mat_no) is None:
-            print('Invalid Matric No.')
-            continue
-        return mat_no
-
-def get_valid_user_profile():
-    return dict(
-        firstname = get_valid_text_from_user('First Name: '),
-        lastname = get_valid_text_from_user('Last Name: '),
-        birthyear = get_birth_year(),
-        nationality = get_valid_text_from_user("Nationality: "),
-        email= get_valid_email(),
-        phone= get_valid_phone(),
-        ) 
+def generate_matric_no() -> str:
+    return f's/{datetime.now(UTC).year}/{random.randrange(1000, 9999)}'
 
 def generate_account_number():
     number = str(datetime.now().year)[2:] + str(random.randrange(10000000, 99999999))
     return number
 
-def get_valid_account_type() -> Literal['current', 'savings']:
-    acct_type_map = {
-        1: 'savings',
-        2: 'current',
-        3: 'savings'
-    }
-
-    while True:
-        acct_type = get_integer_input_from_user('Account-Type: (1-savings, 2-current, 3-default): ')
-        if not acct_type in acct_type_map:
-            print("Please enter a valid response.")
-            continue
-        return acct_type_map[acct_type]
+def is_valid_pin(user_pin: str) -> bool:
+    for trial in range(1, 5):
+        attempts_remaining = 4 - trial
+        response = validate_four_digit("enter 4 digit pin: ")
+        if response == user_pin:
+            return True
+        if attempts_remaining > 0:
+            print(f'you have {attempts_remaining} attempt(s) left.')
+        else:
+            print("Incorrect pin, No more attempts.")
+    return False
 
 def user_to_dict(user: User):
     return {
@@ -208,17 +57,17 @@ def user_to_dict(user: User):
         'acct-type': user.account_type,
     }
 
-def validate_account_number(msg='Account Number: '):
-    while True:
-        acct_no = get_valid_text_from_user(msg)
-        if not acct_no.isdigit() or (not len(acct_no) == 10):
-            print('Invalid Account number. (ctrl-c to quit)')
-            continue
-        return acct_no
+def is_available(book: Book) -> tuple[bool, int]:
+    copies_available = book.copies - book.borrow_count
+    return copies_available > 0, copies_available
 
-def messenger(status: bool, msg: str, payload: Any = None) -> Dict[str, bool | str]:
-    return {
-        'status': status,
-        'message': msg,
-        'payload': payload
-    }
+def format_for_print(books: dict[str, Book], header='Available Books') -> str:
+    line = 50 * '*'
+    text = f"""
+{line}
+\t\t{header}
+{line}\n
+"""
+    for book in books.values():
+        text += f"Author: {book.author.capitalize()}\tBook Name: {book.name.capitalize()}\tCopies Available: {book.copies - book.borrow_count}\n"
+    return text
