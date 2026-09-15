@@ -1,36 +1,46 @@
 import time
-from typing import Dict
-from helper_functions import validate_account_number, get_valid_user_profile, generate_account_number, User, should_continue, validate_client_amt, get_integer_input_from_user, get_valid_transaction_pin, get_valid_account_type, messenger, validate_four_digit
+from helper_functions import  generate_account_number, should_continue, is_valid_pin
+from validators import validate_account_number_input, get_user_profile, validate_client_amt, get_integer_input_from_user, get_valid_transaction_pin, validate_account_type_input
+from models import User
+from exceptions import InsufficientBalanceError
 
-USERS_DATABASE: Dict[str, User] = {}
+USERS_DATABASE: dict[str, User] = {}
 
-def create_account():
-    new_user = get_valid_user_profile()
-    account_name = f'{new_user.get('firstname', '').capitalize()} {new_user.get('lastname', '').capitalize()}'
-
-    acct_type = get_valid_account_type()
-    acct_no = generate_account_number()
+def create_account_ui():
+    new_user = get_user_profile()
+    account_type = validate_account_type_input()
     transaction_pin = get_valid_transaction_pin()
-    user = User(
-        account_name=account_name, 
-        account_number=acct_no, 
-        account_type=acct_type, 
-        transaction_pin=transaction_pin, 
-        **new_user
-        )
-    USERS_DATABASE[acct_no] = user
+    while True:
+        account_no = generate_account_number()
+        if account_no not in USERS_DATABASE:
+            break
 
-    return messenger(status=True, msg=f'\nAccount Created.\nYour Account Details\naccount number: {user.account_number}\naccount name: {user.account_name}\naccount type: {user.account_type}\n')
+    user = User(
+        account_name=f"{new_user.get('firstname').capitalize()} {new_user.get('lastname').capitalize()}",
+        account_number=account_no,
+        account_type=account_type,
+        transaction_pin=transaction_pin,
+        **new_user
+    )
+    create_account(user)
+    print(f"""
+******************* Account Details **********************
+Account Name: {user.account_name}
+Account Number: {user.account_number}
+Account Type: {user.account_type}
+""")
+
+def create_account(user: User):
+    USERS_DATABASE[user.account_number] = user
+    return True
 
 def bank_app():
     while True:
         response = get_integer_input_from_user('(1) - Create Account\n(2) - Already have an account\n(3) - Quit\n:> ')
         if response == 1:
-            res = create_account()
-            msg = res.get('message', '')
-            print(msg)
+            create_account_ui()
         elif response == 2:
-            acct_no = validate_account_number()
+            acct_no = validate_account_number_input()
             if acct_no not in USERS_DATABASE:
                 print('Invalid Account Number.')
                 continue
@@ -42,7 +52,6 @@ def bank_app():
             print('Invalid Response')
 
     print(f'Thank you for banking with us.')
-
 def atm_machine(user: User):
     print(f"Welcome {user.firstname.capitalize()},")
 
@@ -62,83 +71,75 @@ def atm_machine(user: User):
                 simulate_processing()
                 print(f'Your available balance: ${float(user.available_balance)}')
             elif response == 2:
-                deposit(user)
+                deposit_ui(user)
             elif response == 3:
-                withdraw(user)
+                withdraw_ui(user)
             elif response == 4:
-                transfer(user)
+                transfer_ui(user)
             if not should_continue():
                 break
 
-def deposit(user: User):
-    available_balance = user.available_balance
+def deposit_ui(user: User):
     while True:
         amt = validate_client_amt('Amount to Deposit: ')
-        available_balance+=amt
-        user.available_balance = available_balance
+        deposit(user, amt)
         simulate_processing()
-        print(f'${amt} Deposited.')
-        print(f'Your new available balance is ${available_balance}')
+        print(f"""
+${amt} Deposited.
+You available balance is ${user.available_balance}""")
         break
+def deposit(user: User, amt: int):
+    user.available_balance += amt
+    return True
 
-def transfer(user: User):
-    available_balance = user.available_balance
+def transfer_ui(user: User):
     while True:
-        acct_no = validate_account_number('Recipient Account Number, (ctrl+c to quit): ')
-        recipient = USERS_DATABASE.get(acct_no)
-
-        if recipient is None:
-            if not should_continue(msg="Invalid account number: would you like to retry transaction?"):
-                break
-            continue
-
-        amt = validate_client_amt('Amount to transfer: ')
-        print(f"You are about to send '${amt}' to '{recipient.account_name}' Validate transaction by inputing your 4 digit transaction pin")
-        if not is_valid_pin(user.transaction_pin):
+        account_no = validate_account_number_input("Recipient Account Number, (ctrl+c to quit): ")
+        if account_no == user.account_number:
+            print("Error: You cannot Send money to your self.")
             return
-        
-        if amt > available_balance:
-            print('Insufficient Balance.')
-            continue
-        available_balance-=amt
-        recipient.available_balance += amt
-        user.available_balance = available_balance
-        
-        simulate_processing()
-        print(f'Success.\nAvailable balance: ${available_balance}')
-        break
-
-def withdraw(user: User):
-    available_balance = user.available_balance
-    while True:
-        amt = validate_client_amt('How much would like to withdraw?: ')
-        if amt > available_balance:
-            print("Insufficient Account Balance")
-            if not should_continue(msg='Would you like to try again?'):
+        recipient = USERS_DATABASE.get(account_no)
+        if recipient is None:
+            if not should_continue("Invalid Account Number: Would you like to retry the conversation? "):
                 return
             continue
-        available_balance-=amt
-        user.available_balance = available_balance
-        simulate_processing()
-        print(f'${amt} Debited\nYour new available balance is ${available_balance}')
-        break
+        amt = validate_client_amt("Amount to transfer: ")
+        print(f"You are about to transfer ${amt} to {recipient.account_name}, validate transaction by inputing your 4 digit transaction pin.")
+        if not is_valid_pin(user.transaction_pin):
+            return
+        try:
+            transfer(sender=user, recipient=recipient, amt=amt)
+            simulate_processing()
+            print(f"Success.\nYour Available Balance: ${user.available_balance}")
+            return
+        except InsufficientBalanceError:
+            print("Insufficient Balance.")
+            return
+def transfer(sender: User, recipient: User, amt: int):
+    if amt > sender.available_balance:
+        raise InsufficientBalanceError('Insufficient Balance.')
+    
+    sender.available_balance-=amt
+    recipient.available_balance += amt
 
-def is_valid_pin(user_pin: str) -> bool:
-    for trial in range(1, 5):
-        attempts_remaining = 4 - trial
-        response = validate_four_digit("enter 4 digit pin: ")
-        if response == user_pin:
-            return True
-        if attempts_remaining > 0:
-            print(f'you have {attempts_remaining} attempt(s) left.')
-        else:
-            print("Incorrect pin, No more attempts.")
+def withdraw_ui(user: User):
+    amt = validate_client_amt("How much would you like to withdraw? ")
+    if user.available_balance > amt:
+        print("Insufficient Balance.")
+        return
+    withdraw(user=user, amt=amt)
+    simulate_processing()
+    print(f"${amt} Debited\nYour new available balance is ${user.available_balance}")
+def withdraw(user: User, amt: int):
+    user.available_balance-=amt
+    return
 
-    return False
-
-def simulate_processing():
+def simulate_processing(timer=.7):
     print('Processing...')
-    time.sleep(.7)
+    time.sleep(timer)
 
 if __name__ == '__main__':
-    bank_app()
+    try:
+        bank_app()
+    except KeyboardInterrupt:
+        print("\nUser Exited.")
