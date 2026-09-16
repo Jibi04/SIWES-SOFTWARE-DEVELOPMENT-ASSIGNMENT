@@ -16,11 +16,11 @@ def create_account_ui():
             break
 
     user = User(
+        **new_user,
         account_name=f"{new_user.get('firstname').capitalize()} {new_user.get('lastname').capitalize()}",
         account_number=account_no,
         account_type=account_type,
         transaction_pin=transaction_pin,
-        **new_user
     )
     create_account(user)
     print(f"""
