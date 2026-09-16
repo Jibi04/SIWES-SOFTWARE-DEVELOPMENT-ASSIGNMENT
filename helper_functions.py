@@ -58,7 +58,7 @@ def user_to_dict(user: User):
     }
 
 def is_available(book: Book) -> tuple[bool, int]:
-    copies_available = book.copies - book.borrow_count
+    copies_available = book.total_copies - book.borrow_count
     return copies_available > 0, copies_available
 
 def format_for_print(books: dict[str, Book], header='Available Books') -> str:
@@ -69,5 +69,5 @@ def format_for_print(books: dict[str, Book], header='Available Books') -> str:
 {line}\n
 """
     for book in books.values():
-        text += f"Author: {book.author.capitalize()}\tBook Name: {book.name.capitalize()}\tCopies Available: {book.copies - book.borrow_count}\n"
+        text += f"Author: {book.author.capitalize()}\tBook Name: {book.name.capitalize()}\tCopies Available: {book.total_copies - book.borrow_count}\n"
     return text
