@@ -1,34 +1,35 @@
 import random
 from datetime import datetime, UTC
 
-from validators import get_valid_text_from_user, get_integer_input_from_user, get_borrower_profile
+from validators import get_valid_text_from_user, get_integer_input_from_user, get_book_profile, get_and_validate_email, validate_name_input
 from helper_functions import should_continue, format_for_print, is_available
-from exceptions import BorrowedoutError, NotEnoughCopies
-from models import BorrowerProfile, Book
+from exceptions import BorrowedoutError, NotEnoughCopies, IsBorrowedBookError
+from models import BorrowerProfile1, BorrowRecord, Book
 
 
 class LibraryManagement:
     def __init__(self):
         self.book_management = BookManagement()
-        self.borrower_profiles: dict[str, BorrowerProfile] = {}
+        self.borrower_profiles: dict[str, BorrowerProfile1] = {}
 
     def add_book(self, name: str, author: str, book_count: int) -> str:
-        book = self.book_management.get_book(name=name, author=author)
+        book = self.book_management.get_book_by_name_and_author(name=name, author=author)
         if book:
             # Book instance already exists increase copies count
-            self.book_management.add_to_library(book.book_id, copies=book_count)
+            self.book_management.add_to_library(book.book_id, copies_to_add=book_count)
         else:
             book_id = 'B-' + str(random.randrange(1000, 9999))
-            book = Book(book_id=book_id, name=name, author=author, copies=book_count)
+            book = Book(book_id=book_id, name=name, author=author, total_copies=book_count)
             self.book_management.add_book(book)
         return book.book_id
-    def delete_book(self, name: str, author: str) -> str:
-        if not (book:=self.book_management.get_book(name=name, author=author)):
-            raise ValueError(f"Invalid key parameters Name: '{name}' Author: '{author}' .")
-        self.book_management.delete_book(book.book_id)
-        return book.book_id
-    def borrow_book(self, name: str, author: str, borrow_count: int, borrower_profile: dict[str, str]) -> str:
-        book = self.book_management.get_book(name=name, author=author)
+    def delete_book(self, book_id: str) -> str:
+        if not self.book_management.get_book_by_id(book_id=book_id):
+            raise ValueError(f"Invalid book ID.")
+        self.book_management.delete_book(book_id)
+        return book_id
+    
+    def borrow_book(self, name: str, author: str, borrow_count: int, borrower_profile: BorrowerProfile1) -> str:
+        book = self.book_management.get_book_by_name_and_author(name=name, author=author)
         if book is None:
             raise ValueError(f"'{name}' by '{author}' not in our database.")
 
@@ -39,17 +40,32 @@ class LibraryManagement:
             raise NotEnoughCopies(copies_available=copies_available)
 
         self.book_management.borrow_book(book.book_id, borrow_count)
-        client_profile = {'book_id': book.book_id, 'borrow_count': borrow_count, 'date_borrowed': datetime.now(UTC)}
-        for k, v in client_profile.items():
-            borrower_profile[k] = v
-        profile = BorrowerProfile(**borrower_profile)
-        self.borrower_profiles[profile.user_id] = profile
+        if book.book_id in borrower_profile.active_borrowings:
+            borrower_profile.active_borrowings[book.book_id].copies_borrowed += borrow_count
+        else:
+            borrower_profile.active_borrowings[book.book_id] = BorrowRecord(
+                book_id = book.book_id,
+                copies_borrowed=borrow_count,
+                date_borrowed=datetime.now(UTC).isoformat()
+            )
+
+        self.borrower_profiles[borrower_profile.user_id] = borrower_profile
         return book.book_id
-    def return_book(self, user_id) -> str:
-        user = self.validate_user_input(user_id=user_id)
-        self.book_management.return_book(user.book_id, user.borrow_count)
-        del self.borrower_profiles[user_id]
-        return user_id
+    
+    def return_book(self, user_id: str, book_id: str) -> None:
+        user = self.borrower_profiles.get(user_id)
+        if user is None:
+            raise ValueError("Invalid UserID")
+        if book_id not in user.active_borrowings:
+            raise ValueError("Invalid BookID")
+        
+        self.book_management.return_book(book_id, user.active_borrowings[book_id].copies_borrowed)
+        del user.active_borrowings[book_id]
+        if not user.active_borrowings:
+            del self.borrower_profiles[user_id]
+            return
+        self.borrower_profiles[user_id] = user
+    
     def search_library(self, key) -> dict[str, Book]:
         books = self.book_management.find_book(key)
         if not books:
@@ -57,39 +73,43 @@ class LibraryManagement:
         return books
     def books_available(self) -> dict[str, Book]:
         return self.book_management.get_books()
-    def validate_user_input(self, user_id: str) -> BorrowerProfile:
+    
+    def validate_user_input(self, user_id: str, book_id: str) -> BorrowerProfile1:
         user = self.borrower_profiles.get(user_id)
         if user is None:
             raise ValueError(f"Invalid User ID: '{user_id}'")
-        book = self.book_management.get_book(book_id=user.book_id)
-        if book is None:
-            raise ValueError(f"Invalid Book ID: '{user.book_id}'")
+        
         return user
+
+    def get_profile_if_exists(self, email: str) -> BorrowerProfile1 | None:
+        for profile in self.borrower_profiles.values():
+            if profile.email == email:
+                return profile
+        return 
     
 class BookManagement:
     def __init__(self):
         self._book_database: dict[str, Book] = {}
 
+    def get_book_by_id(self, book_id: str) -> Book | None:
+        return self._book_database.get(book_id)
     def add_book(self, book: Book) -> str:
         book_id = book.book_id
         self._book_database[book_id] = book
         return book_id
-    def get_book(self, name: str | None = None, author: str | None = None, book_id: str | None = None) -> Book | None:
-        if book_id:
-            return self._book_database.get(book_id)
-
-        if name is None:
-            raise ValueError("Name parameter cannot be None.")
-        if author is None:
-            raise ValueError("Author parameter cannot be None.")
-        
+    def get_book_by_name_and_author(self, name: str, author: str) -> Book | None:
         for book in self._book_database.values():
-            if (name in book.name) and (author in book.author):
+            if (name.lower() in book.name.lower()) and (author.lower() in book.author.lower()):
                 return book
         return
     def delete_book(self, book_id: str) -> bool:
-        if book_id not in self._book_database:
+        book = self._book_database.get(book_id)
+        if book is None:
             raise ValueError(f"Invalid bookID: '{book_id}'")
+
+        if not book.borrow_count == 0:
+            raise IsBorrowedBookError(f"{book.borrow_count} copies of {book_id} are not yet returned, cannot complete delete operation.")
+        
         del self._book_database[book_id]
         return True
     def borrow_book(self, book_id: str, borrow_count: int = 1) -> str:
@@ -122,12 +142,12 @@ class BookManagement:
 
         return matches
     def get_books(self) -> dict[str, Book]:
-        return self._book_database
-    def add_to_library(self, book_id, copies: int):
+        return self._book_database.copy()
+    def add_to_library(self, book_id, copies_to_add: int):
         book = self._book_database.get(book_id)
         if book is None:
             raise ValueError(f"Invalid book ID: '{book_id}'")
-        book.copies += copies
+        book.total_copies += copies_to_add
         self._book_database[book.book_id] = book
 
 
@@ -139,22 +159,24 @@ def add_book_ui(library: LibraryManagement) -> None:
     book_id = library.add_book(name=name, author=author, book_count=book_count)
     print(f"Book Added: bookID '{book_id}'")
 def delete_book_ui(library: LibraryManagement) -> None:
-    name = get_valid_text_from_user("Name: ")
-    author = get_valid_text_from_user("Author: ")
+    book_id = input("BookID: ")
     try:
-        library.delete_book(name=name, author=author)
+        library.delete_book(book_id)
+        print("Sucess!!")
     except ValueError as e:
         print(e)
+    except IsBorrowedBookError as e:
+        print(e)
 def borrow_book_ui(library: LibraryManagement) -> None:
-    borrower_name, user_id, name, email, author, borrow_count = get_borrower_profile()
-    borrower_profile = {
-        'name': borrower_name,
-        'email': email,
-        'user_id': user_id 
-        }
+    email = get_and_validate_email()
+    borrower_profile = library.get_profile_if_exists(email)
+    name, author, borrow_count = get_book_profile()
+    if borrower_profile is None:
+        borrower_name = validate_name_input("Your name: ")
+        user_id = "U-" + str(random.randrange(1000, 9999))
+        borrower_profile = BorrowerProfile1(name=borrower_name, email=email, user_id=user_id)
     try:
-        library.borrow_book(name=name, author=author, borrow_count=borrow_count, borrower_profile=borrower_profile)
-        print(f"your borrwerID: '{user_id}'")
+        book_id = library.borrow_book(name=name, author=author, borrow_count=borrow_count, borrower_profile=borrower_profile)
     except BorrowedoutError as e:
         print(e)
         return
@@ -167,10 +189,13 @@ def borrow_book_ui(library: LibraryManagement) -> None:
     except ValueError as e:
         print(e)
         return
+    print(f"Success!!\nYour BorrwerID: '{borrower_profile.user_id}'\nBookID: '{book_id}'")
 def return_book_ui(library: LibraryManagement) -> None:
     user_id = get_valid_text_from_user("User ID: ").upper()
+    book_id = get_valid_text_from_user("Book ID: ").upper()
     try:
-        library.return_book(user_id=user_id)
+        library.return_book(user_id=user_id, book_id=book_id)
+        print("Success!!")
     except ValueError as e:
         print(e)
         return
