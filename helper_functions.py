@@ -1,6 +1,5 @@
 import random
 from datetime import datetime, UTC
-from typing import Literal
 from models import User, Book
 from validators import validate_four_digit
 
