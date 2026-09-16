@@ -59,7 +59,6 @@ class StudentRepository:
         self.update_student_data()
 
     def delete_student_data(self, key: str) -> None:
-        students = self.students_data.copy()
         if key not in self.students_data:
             raise StudentNotFoundError(f"Invalid Matric Number: '{key}'")
         
@@ -82,7 +81,7 @@ class StudentService:
 
         data['matric_no'] = matric_no
         
-        status = self.student_repo.save_student_to_db(data)
+        self.student_repo.save_student_to_db(data)
         return matric_no
 
     def get_student(self, key: str) -> Student:
@@ -115,6 +114,7 @@ def get_student_ui(management: StudentService) -> None:
         return
     except StudentRepositoryError as e:
         print(e)
+        return
     
     line = 50 * '*'
     print(line)
