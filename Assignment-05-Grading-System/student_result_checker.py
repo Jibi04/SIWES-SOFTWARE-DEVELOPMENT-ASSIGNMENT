@@ -1,4 +1,4 @@
-from helper_functions import get_integer_input_from_user
+from validators import get_integer_input_from_user
 def student_result_checker():
     name = input('Your Name: ')
     print(f'Hi {name},')

@@ -1,5 +1,5 @@
-from helper_functions import get_integer_input_from_user, should_continue, validate_client_amt
-
+from validators import validate_client_amt
+from helper_functions import should_continue
 def atm_machine():
     available_balance = 100000.00
     user = input('accout name: ')

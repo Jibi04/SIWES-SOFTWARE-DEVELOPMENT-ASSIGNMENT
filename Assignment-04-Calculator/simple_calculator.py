@@ -1,4 +1,4 @@
-from helper_functions import get_integer_input_from_user
+from validators import get_integer_input_from_user
 def simple_calculator():
     val1 = get_integer_input_from_user('Enter First Number')
     val2 = get_integer_input_from_user('Enter Second Number')

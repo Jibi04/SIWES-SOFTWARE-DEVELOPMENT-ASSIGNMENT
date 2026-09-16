@@ -1,4 +1,5 @@
-from helper_functions import get_integer_input_from_user, should_continue
+from helper_functions import should_continue
+from validators import get_integer_input_from_user
 
 def shopping_cart_system():
     products = []
