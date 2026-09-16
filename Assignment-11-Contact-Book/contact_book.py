@@ -1,4 +1,5 @@
-from helper_functions import get_contact_info, get_integer_input_from_user, should_continue, get_contact_card
+from validators import get_contact_info, get_integer_input_from_user
+from helper_functions import should_continue, get_contact_card
 from typing import Tuple, Dict, Any
 
 CONTACT_DATABASE = {}
