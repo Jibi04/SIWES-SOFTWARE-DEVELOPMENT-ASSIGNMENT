@@ -1,5 +1,4 @@
 import re
-import random
 from datetime import datetime, UTC
 from typing import Literal
 from models import Student, ClientProfile
