@@ -15,13 +15,13 @@ def get_integer_input_from_user(msg: str) -> int:
             print('Please select a valid number greater than zero.')
             continue
         return integer_res
-def get_birth_year() -> str:
+def get_birth_year() -> int:
     while True:
         res = get_integer_input_from_user(msg='Birth year: ')
         if (1905 >= res) or (res >= datetime.now(UTC).year):
             print('Invalid birth year')
             continue
-        return str(res)
+        return res
 def get_valid_age() -> int:
     res = get_birth_year()
     return (datetime.now().year - int(res))
@@ -126,14 +126,11 @@ def validate_account_type_input() -> Literal['current', 'savings']:
             print("Please enter a valid response.")
             continue
         return acct_type_map[acct_type]
-def get_borrower_profile():
-    borrower_name = validate_name_input("Your Name: ")
-    email = get_and_validate_email()
-    user_id = "U-" + str(random.randrange(1000, 9999))
+def get_book_profile():
     name = validate_name_input("Book Name: ")
     author = validate_name_input("Author: ")
     borrow_count = get_integer_input_from_user("Copies to borrow: ")
-    return (borrower_name, user_id, name, email, author, borrow_count)
+    return (name, author, borrow_count)
 def get_user_profile() -> ClientProfile:
     return{
         "firstname": validate_name_input('First Name: '),
