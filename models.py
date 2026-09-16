@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypedDict, Literal
 
 @dataclass
@@ -18,7 +18,7 @@ class User:
 class ClientProfile(TypedDict):
     firstname: str
     lastname: str
-    birthyear: str
+    birthyear: int
     nationality: str
     email: str
     phone: str
@@ -36,14 +36,18 @@ class Book:
     book_id: str
     name: str
     author: str
-    copies: int
+    total_copies: int
     borrow_count: int = 0
 
 @dataclass
-class BorrowerProfile:
+class BorrowerProfile1:
     name: str
     email: str
     user_id: str
+    active_borrowings: dict[str, BorrowRecord] = field(default_factory=dict)
+
+@dataclass
+class BorrowRecord:
     book_id: str
-    borrow_count: int
+    copies_borrowed: int
     date_borrowed: str
