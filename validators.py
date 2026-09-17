@@ -62,9 +62,13 @@ def get_valid_matric_no() -> str:
         return mat_no
 def get_valid_text_from_user(msg: str = '') -> str:
     while True:
-        response = input(f'{msg}').strip().lower()
+        response = input(f'{msg}').strip()
         if not response:
             print("Field is empty.")
+            continue
+        pattern = re.compile(r"^[0-9\w'\.]+$")
+        if not pattern.fullmatch(response):
+            print("Please Input a valid text.")
             continue
         return response
 def get_valid_transaction_pin() -> str:
