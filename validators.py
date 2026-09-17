@@ -24,11 +24,13 @@ def get_birth_year() -> int:
 def get_valid_age() -> int:
     res = get_birth_year()
     return (datetime.now().year - int(res))
-def get_floating_input_from_user(msg: str) -> float:
+def get_floating_input_from_user(msg: str, allow_zero: bool = False) -> float:
     while True:
         try:
             res = float(input(f'{msg}'))
             if res <= 0:
+                if allow_zero:
+                    return res
                 print('Please input a valid decimal value greater than 0.0')
                 continue
             return float(res)
