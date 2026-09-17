@@ -1,1 +1,5 @@
-/__pycache__
+*/__pycache__
+/.venv
+*/students_data_dir
+/python_django_course.egg-info
+*.json
